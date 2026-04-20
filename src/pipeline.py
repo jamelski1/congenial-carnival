@@ -109,9 +109,14 @@ def run(
     if "qkrr" in models:
         from src.quantum.qkrr import QKRRConfig, QuantumKernelRidge  # lazy
 
+        qkrr_yaml = cfg["quantum"]["qkrr"]
         qkrr_cfg = QKRRConfig(
             n_qubits=red_cfg.n_qubits,
-            alpha=float(cfg["quantum"]["qkrr"]["alpha"]),
+            alpha=float(qkrr_yaml["alpha"]),
+            bandwidth=qkrr_yaml.get("bandwidth", 1.0),
+            cv_folds=int(qkrr_yaml.get("cv_folds", 5)),
+            cv_subsample=qkrr_yaml.get("cv_subsample"),
+            cv_random_seed=int(cfg["split"]["random_seed"]),
             feature_map=dict(cfg["quantum"]["feature_map"]),
         )
         qkrr = QuantumKernelRidge(qkrr_cfg, handles).fit(X_train, y_train)

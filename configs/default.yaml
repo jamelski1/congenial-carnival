@@ -45,6 +45,12 @@ quantum:
   qkrr:
     alpha: 1.0                  # ridge regularisation
     shots: 1024
+    # Bandwidth γ defends against kernel concentration: features are scaled
+    # by γ before angle-encoding so rotations stay near identity. A list
+    # triggers grid-search via CV on the training fold.
+    bandwidth: [1.0, 0.3, 0.1, 0.03, 0.01]
+    cv_folds: 5
+    cv_subsample: 200           # cap CV training to keep Gram tractable
 
 classical:
   xgboost:

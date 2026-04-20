@@ -29,6 +29,14 @@ quantum:
   qkrr:
     alpha: 1.0
     shots: 1024
+    bandwidth:
+    - 1.0
+    - 0.3
+    - 0.1
+    - 0.03
+    - 0.01
+    cv_folds: 5
+    cv_subsample: 200
 classical:
   xgboost:
     n_estimators: 500
