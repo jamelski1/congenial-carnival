@@ -39,6 +39,7 @@ def run(
     output_dir: Path,
     X_override: np.ndarray | None = None,
     y_override: np.ndarray | None = None,
+    subsample: int | None = None,
 ) -> dict[str, Any]:
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -55,6 +56,12 @@ def run(
         )
         X_raw, y_raw = X_df.to_numpy(dtype=float), y_s.to_numpy(dtype=float)
         print(f"[data] loaded {X_raw.shape[0]} rows x {X_raw.shape[1]} features")
+
+    if subsample is not None and subsample < len(X_raw):
+        rng = np.random.default_rng(int(cfg["split"]["random_seed"]))
+        idx = rng.choice(len(X_raw), size=subsample, replace=False)
+        X_raw, y_raw = X_raw[idx], y_raw[idx]
+        print(f"[data] subsampled to {len(X_raw)} rows (seed={cfg['split']['random_seed']})")
 
     red_cfg = ReducerConfig(
         n_qubits=int(cfg["preprocessing"]["n_qubits"]),
@@ -154,11 +161,17 @@ def main() -> None:
         help="comma-separated subset of {xgb,qkrr,vqr}",
     )
     parser.add_argument("--output-dir", default="models/latest")
+    parser.add_argument(
+        "--subsample",
+        type=int,
+        default=None,
+        help="randomly subsample N rows before split. Useful to keep the quantum-kernel Gram O(N^2) tractable (e.g. --subsample 500).",
+    )
     args = parser.parse_args()
 
     cfg = load_config(args.config)
     models = [m.strip() for m in args.models.split(",") if m.strip()]
-    results = run(cfg, args.backend, models, Path(args.output_dir))
+    results = run(cfg, args.backend, models, Path(args.output_dir), subsample=args.subsample)
 
     print(json.dumps(results, indent=2))
 

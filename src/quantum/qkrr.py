@@ -20,9 +20,19 @@ class QKRRConfig:
 class QuantumKernelRidge(BaseEstimator, RegressorMixin):
     """Kernel ridge regression with a quantum fidelity kernel.
 
-    Uses qiskit-machine-learning's FidelityQuantumKernel against the configured
-    feature map. The kernel matrices are precomputed and handed to sklearn's
-    KernelRidge, which keeps the classical bit drop-in-swappable.
+    Two kernel paths depending on the backend:
+
+    - On `aer` (local simulator) we use `FidelityStatevectorKernel`, which
+      computes |<psi(x)|psi(y)>|^2 analytically from the statevector. No
+      shots, no SWAP-test circuits — orders of magnitude faster and still
+      mathematically identical to the noiseless limit of the shot-based
+      kernel.
+    - On `ibm` (real hardware) we fall back to `FidelityQuantumKernel` +
+      `ComputeUncompute`, which runs SWAP-test-style circuits through the
+      configured V2 sampler.
+
+    The kernel matrix is precomputed and handed to sklearn's KernelRidge,
+    keeping the regression step drop-in-swappable with classical kernels.
     """
 
     def __init__(self, config: QKRRConfig, handles: BackendHandles):
@@ -33,10 +43,14 @@ class QuantumKernelRidge(BaseEstimator, RegressorMixin):
         self._X_train: np.ndarray | None = None
 
     def _build_kernel(self):
+        fmap = build_feature_map(self.config.n_qubits, **self.config.feature_map)
+
+        if self.handles.name.startswith("aer"):
+            from qiskit_machine_learning.kernels import FidelityStatevectorKernel
+            return FidelityStatevectorKernel(feature_map=fmap)
+
         from qiskit_machine_learning.kernels import FidelityQuantumKernel
         from qiskit_machine_learning.state_fidelities import ComputeUncompute
-
-        fmap = build_feature_map(self.config.n_qubits, **self.config.feature_map)
         fidelity = ComputeUncompute(sampler=self.handles.sampler)
         return FidelityQuantumKernel(feature_map=fmap, fidelity=fidelity)
 
