@@ -65,6 +65,7 @@ def run(
 
     red_cfg = ReducerConfig(
         n_qubits=int(cfg["preprocessing"]["n_qubits"]),
+        k_features=cfg["preprocessing"].get("k_features"),
         mode=str(cfg["preprocessing"].get("mode", "pca")),
         scale_features=bool(cfg["preprocessing"]["scale_features"]),
         log_transform_target=bool(cfg["preprocessing"]["log_transform_target"]),
@@ -112,6 +113,7 @@ def run(
         qkrr_yaml = cfg["quantum"]["qkrr"]
         qkrr_cfg = QKRRConfig(
             n_qubits=red_cfg.n_qubits,
+            n_features=red_cfg.effective_k,
             alpha=float(qkrr_yaml["alpha"]),
             bandwidth=qkrr_yaml.get("bandwidth", 1.0),
             cv_folds=int(qkrr_yaml.get("cv_folds", 5)),

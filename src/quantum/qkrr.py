@@ -15,6 +15,10 @@ from .circuits import build_feature_map
 @dataclass
 class QKRRConfig:
     n_qubits: int
+    # Number of classical features the model is actually fed. When larger
+    # than n_qubits the feature map chunks the input and re-uploads across
+    # the same register. None => matches n_qubits (standard single-block).
+    n_features: int | None = None
     alpha: float = 1.0
     # Bandwidth γ: features are scaled by γ before angle-encoding. Single
     # float = fixed bandwidth; sequence = grid-search the best γ via CV
@@ -60,7 +64,11 @@ class QuantumKernelRidge(BaseEstimator, RegressorMixin):
         self._cv_scores: dict[float, float] | None = None
 
     def _build_kernel(self):
-        fmap = build_feature_map(self.config.n_qubits, **self.config.feature_map)
+        fmap = build_feature_map(
+            self.config.n_qubits,
+            n_features=self.config.n_features,
+            **self.config.feature_map,
+        )
 
         if self.handles.name.startswith("aer"):
             from qiskit_machine_learning.kernels import FidelityStatevectorKernel
