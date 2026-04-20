@@ -1,0 +1,48 @@
+# Quantum-effort-estimation config. Mirrors btoe where practical.
+
+data:
+  path: data/features.parquet
+  target: duration_hours
+  embedding_prefix: emb_
+
+split:
+  test_size: 0.2
+  random_seed: 42
+
+preprocessing:
+  # Second-stage PCA: btoe already reduced CodeBERT 768 -> 50.
+  # We further reduce (embeddings + repo features combined) -> n_qubits.
+  n_qubits: 8
+  log_transform_target: true   # duration_hours is heavy-tailed; log1p target
+  scale_features: true          # MinMax [0, pi] for angle encoding
+
+quantum:
+  feature_map:
+    kind: zz                    # zz | pauli
+    reps: 2
+    entanglement: linear
+  ansatz:
+    kind: real_amplitudes       # real_amplitudes | efficient_su2
+    reps: 3
+    entanglement: linear
+  vqr:
+    optimizer: cobyla
+    maxiter: 150
+    initial_point: null         # null = random
+  qkrr:
+    alpha: 1.0                  # ridge regularisation
+    shots: 1024
+
+classical:
+  xgboost:
+    n_estimators: 500
+    max_depth: 6
+    learning_rate: 0.1
+    subsample: 0.8
+    colsample_bytree: 0.8
+    reg_alpha: 0.1
+    reg_lambda: 1.0
+
+evaluation:
+  metrics: [mae, mdae, mmre, pred_25, pred_50, r2, sa]
+  wilcoxon_alpha: 0.05
