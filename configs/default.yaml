@@ -1,17 +1,26 @@
 # Quantum-effort-estimation config. Mirrors btoe where practical.
 
 data:
-  path: data/features.parquet
+  # btoe two-file layout: features parquet has only feature columns;
+  # the target lives in a raw issue/PR parquet aligned by row index.
+  # Set raw_path to null when features parquet contains the target itself
+  # (e.g. the synthetic demo).
+  path: data/nlp_features.parquet
+  raw_path: data/issue_pr_pairs.parquet
   target: duration_hours
   embedding_prefix: emb_
+  # Mirrors btoe's filtering.{min_duration_hours, max_duration_days}.
+  min_duration_hours: 1
+  max_duration_days: 90
 
 split:
   test_size: 0.2
   random_seed: 42
 
 preprocessing:
-  # Second-stage PCA: btoe already reduced CodeBERT 768 -> 50.
-  # We further reduce (embeddings + repo features combined) -> n_qubits.
+  # Two-stage compression to fit the qubit budget. btoe's first-stage PCA
+  # produced 50 dims; this parquet still has the raw 768 CodeBERT dims plus
+  # 6 derived features, so the PCA below absorbs both stages at once.
   n_qubits: 8
   log_transform_target: true   # duration_hours is heavy-tailed; log1p target
   scale_features: true          # MinMax [0, pi] for angle encoding

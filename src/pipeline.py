@@ -21,9 +21,10 @@ from src.preprocessing.reducer import (
     inverse_transform_target,
     transform_target,
 )
-from src.quantum.backends import get_backend
-from src.quantum.qkrr import QKRRConfig, QuantumKernelRidge
-from src.quantum.vqr import VQRConfig, VQRegressor
+
+# Quantum dependencies (qiskit, qiskit-machine-learning) are heavy and only
+# needed for the quantum models. Import them lazily inside `run()` so the
+# pipeline can execute in classical-only mode without qiskit installed.
 
 
 def load_config(path: str | Path) -> dict[str, Any]:
@@ -44,8 +45,16 @@ def run(
     if X_override is not None and y_override is not None:
         X_raw, y_raw = X_override, y_override
     else:
-        X_df, y_s = load_features(cfg["data"]["path"], cfg["data"]["target"])
+        data_cfg = cfg["data"]
+        X_df, y_s = load_features(
+            path=data_cfg["path"],
+            target=data_cfg["target"],
+            raw_path=data_cfg.get("raw_path"),
+            min_duration_hours=data_cfg.get("min_duration_hours"),
+            max_duration_days=data_cfg.get("max_duration_days"),
+        )
         X_raw, y_raw = X_df.to_numpy(dtype=float), y_s.to_numpy(dtype=float)
+        print(f"[data] loaded {X_raw.shape[0]} rows x {X_raw.shape[1]} features")
 
     red_cfg = ReducerConfig(
         n_qubits=int(cfg["preprocessing"]["n_qubits"]),
@@ -69,6 +78,8 @@ def run(
 
     handles = None
     if any(m in models for m in ("vqr", "qkrr")):
+        from src.quantum.backends import get_backend  # lazy
+
         shots = int(cfg["quantum"]["qkrr"].get("shots", 1024))
         handles = get_backend(backend, shots=shots)
         print(f"[backend] {handles.name}")
@@ -83,6 +94,8 @@ def run(
         preds_real["xgb"] = inverse_transform_target(xgb.predict(X_test), red_cfg)
 
     if "qkrr" in models:
+        from src.quantum.qkrr import QKRRConfig, QuantumKernelRidge  # lazy
+
         qkrr_cfg = QKRRConfig(
             n_qubits=red_cfg.n_qubits,
             alpha=float(cfg["quantum"]["qkrr"]["alpha"]),
@@ -93,6 +106,8 @@ def run(
         preds_real["qkrr"] = inverse_transform_target(qkrr.predict(X_test), red_cfg)
 
     if "vqr" in models:
+        from src.quantum.vqr import VQRConfig, VQRegressor  # lazy
+
         vqr_cfg = VQRConfig(
             n_qubits=red_cfg.n_qubits,
             feature_map=dict(cfg["quantum"]["feature_map"]),

@@ -37,16 +37,21 @@ the "fewer features" delta.
 
 ## Input data
 
-Drop btoe's feature tables into `data/`:
+Btoe stores features and the target in **two separate files** aligned by row
+index. Mirror that layout here:
 
 ```
-data/features.parquet
+data/nlp_features.parquet      # feature columns only (emb_*, derived NLP scores)
+data/issue_pr_pairs.parquet    # raw issue/PR metadata, contains duration_hours
 ```
 
-Expected columns:
-- `duration_hours` — target (float, > 0)
-- `emb_0 … emb_49` — PCA'd CodeBERT embeddings
-- any number of repo-mined numeric columns (churn, coupling, tfidf_*, …)
+The two parquets must have the same row count and same ordering — `load_features`
+filters them with a shared boolean mask using `data.min_duration_hours` and
+`data.max_duration_days` from the config (defaults match btoe: ≥1h and ≤90d).
+
+If you only have a single self-contained file with the target column inside it,
+set `data.raw_path: null` in the config and put the target column inside the
+features parquet itself.
 
 If you don't have real data yet, run the synthetic demo:
 
