@@ -18,10 +18,14 @@ split:
   random_seed: 42
 
 preprocessing:
-  # Two-stage compression to fit the qubit budget. btoe's first-stage PCA
-  # produced 50 dims; this parquet still has the raw 768 CodeBERT dims plus
-  # 6 derived features, so the PCA below absorbs both stages at once.
-  n_qubits: 8
+  # Compress the raw 774-d feature vector down to the qubit budget.
+  # mode=topk picks the K most predictive features via a quick XGBoost
+  # importance fit (signal-driven). mode=pca takes K principal components
+  # (variance-driven; can be dominated by raw-scale columns like text_length).
+  # n_qubits=20 fits comfortably on Aer statevector (2^20 = 1M amplitudes,
+  # ~8 MB) and is reachable on real IBM hardware with shallow circuits.
+  mode: topk
+  n_qubits: 20
   log_transform_target: true   # duration_hours is heavy-tailed; log1p target
   scale_features: true          # MinMax [0, pi] for angle encoding
 

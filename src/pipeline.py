@@ -65,8 +65,10 @@ def run(
 
     red_cfg = ReducerConfig(
         n_qubits=int(cfg["preprocessing"]["n_qubits"]),
+        mode=str(cfg["preprocessing"].get("mode", "pca")),
         scale_features=bool(cfg["preprocessing"]["scale_features"]),
         log_transform_target=bool(cfg["preprocessing"]["log_transform_target"]),
+        random_seed=int(cfg["split"]["random_seed"]),
     )
 
     X_train_raw, X_test_raw, y_train_raw, y_test_raw = train_test_split(
@@ -77,7 +79,11 @@ def run(
     )
 
     reducer = build_feature_pipeline(red_cfg)
-    X_train = reducer.fit_transform(X_train_raw)
+    # topk mode needs y at fit time; pca mode ignores it. Pass log-transformed
+    # target so feature importance is ranked against the same target the
+    # downstream regressors will optimise for.
+    y_train_for_reducer = transform_target(y_train_raw, red_cfg)
+    X_train = reducer.fit_transform(X_train_raw, y_train_for_reducer)
     X_test = reducer.transform(X_test_raw)
 
     y_train = transform_target(y_train_raw, red_cfg)
