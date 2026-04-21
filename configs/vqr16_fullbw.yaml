@@ -1,0 +1,59 @@
+data:
+  path: data/nlp_features.parquet
+  raw_path: data/issue_pr_pairs.parquet
+  target: duration_hours
+  embedding_prefix: emb_
+  min_duration_hours: 1
+  max_duration_days: 90
+split:
+  test_size: 0.2
+  random_seed: 42
+preprocessing:
+  mode: topk
+  n_qubits: 16
+  log_transform_target: true
+  scale_features: true
+quantum:
+  feature_map:
+    kind: zz
+    reps: 2
+    entanglement: linear
+  ansatz:
+    kind: real_amplitudes
+    reps: 3
+    entanglement: linear
+  vqr:
+    optimizer: cobyla
+    maxiter: 300
+    initial_point: null
+    bandwidth: 1.0
+  qkrr:
+    alpha: 1.0
+    shots: 1024
+    bandwidth:
+    - 1.0
+    - 0.3
+    - 0.1
+    - 0.03
+    - 0.01
+    cv_folds: 5
+    cv_subsample: 200
+classical:
+  xgboost:
+    n_estimators: 500
+    max_depth: 6
+    learning_rate: 0.1
+    subsample: 0.8
+    colsample_bytree: 0.8
+    reg_alpha: 0.1
+    reg_lambda: 1.0
+evaluation:
+  metrics:
+  - mae
+  - mdae
+  - mmre
+  - pred_25
+  - pred_50
+  - r2
+  - sa
+  wilcoxon_alpha: 0.05
