@@ -40,6 +40,12 @@ class VQRegressor(BaseEstimator, RegressorMixin):
         self.config = config
         self.handles = handles
         self._model: Any = None
+        # VQR's default observable is <Z>, which outputs values in [-1, 1].
+        # We standardise y to zero mean / unit variance during fit so it
+        # lives in a range the network can actually reach, and invert at
+        # predict time.
+        self._y_mean: float = 0.0
+        self._y_std: float = 1.0
 
     def _build_optimizer(self):
         from qiskit_machine_learning.optimizers import COBYLA, L_BFGS_B, SPSA
@@ -79,11 +85,18 @@ class VQRegressor(BaseEstimator, RegressorMixin):
     def fit(self, X: np.ndarray, y: np.ndarray) -> "VQRegressor":
         self._model = self._build_model()
         Xs = np.asarray(X, dtype=float) * self.config.bandwidth
-        self._model.fit(Xs, np.asarray(y, dtype=float))
+        y = np.asarray(y, dtype=float)
+        self._y_mean = float(y.mean())
+        self._y_std = float(y.std())
+        if self._y_std < 1e-9:
+            self._y_std = 1.0
+        y_scaled = (y - self._y_mean) / self._y_std
+        self._model.fit(Xs, y_scaled)
         return self
 
     def predict(self, X: np.ndarray) -> np.ndarray:
         if self._model is None:
             raise RuntimeError("VQRegressor.fit must be called before predict")
         Xs = np.asarray(X, dtype=float) * self.config.bandwidth
-        return np.asarray(self._model.predict(Xs)).ravel()
+        y_scaled = np.asarray(self._model.predict(Xs)).ravel()
+        return y_scaled * self._y_std + self._y_mean
