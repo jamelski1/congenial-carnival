@@ -128,12 +128,15 @@ def run(
     if "vqr" in models:
         from src.quantum.vqr import VQRConfig, VQRegressor  # lazy
 
+        vqr_yaml = cfg["quantum"]["vqr"]
         vqr_cfg = VQRConfig(
             n_qubits=red_cfg.n_qubits,
+            n_features=red_cfg.effective_k,
+            bandwidth=float(vqr_yaml.get("bandwidth", 1.0)),
             feature_map=dict(cfg["quantum"]["feature_map"]),
             ansatz=dict(cfg["quantum"]["ansatz"]),
-            optimizer=str(cfg["quantum"]["vqr"]["optimizer"]),
-            maxiter=int(cfg["quantum"]["vqr"]["maxiter"]),
+            optimizer=str(vqr_yaml["optimizer"]),
+            maxiter=int(vqr_yaml["maxiter"]),
             random_seed=int(cfg["split"]["random_seed"]),
         )
         vqr = VQRegressor(vqr_cfg, handles).fit(X_train, y_train)

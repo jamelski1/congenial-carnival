@@ -13,6 +13,14 @@ from .circuits import build_ansatz, build_feature_map
 @dataclass
 class VQRConfig:
     n_qubits: int
+    # Number of classical features fed into the feature map. When larger
+    # than n_qubits the feature map chunks the input across blocks on the
+    # same qubit register (data re-uploading). None => matches n_qubits.
+    n_features: int | None = None
+    # Bandwidth γ: inputs are scaled by γ before angle-encoding. Keeps the
+    # encoding rotations small so gradients don't vanish (the variational
+    # analogue of kernel concentration).
+    bandwidth: float = 1.0
     feature_map: dict = field(default_factory=lambda: {"kind": "zz", "reps": 2, "entanglement": "linear"})
     ansatz: dict = field(default_factory=lambda: {"kind": "real_amplitudes", "reps": 3, "entanglement": "linear"})
     optimizer: str = "cobyla"
@@ -46,14 +54,14 @@ class VQRegressor(BaseEstimator, RegressorMixin):
         raise ValueError(f"unknown optimizer: {self.config.optimizer}")
 
     def _build_model(self):
+        # qml 0.9's VQR uses V2 primitives internally and picks its own
+        # gradient calculator — the earlier `gradient=` kwarg was removed.
         from qiskit_machine_learning.algorithms.regressors import VQR
-        from qiskit_machine_learning.gradients import ParamShiftEstimatorGradient
 
         n = self.config.n_qubits
-        fmap = build_feature_map(n, **self.config.feature_map)
+        fmap = build_feature_map(n, n_features=self.config.n_features, **self.config.feature_map)
         ansatz = build_ansatz(n, **self.config.ansatz)
         optimizer = self._build_optimizer()
-        gradient = ParamShiftEstimatorGradient(self.handles.estimator)
 
         initial_point = self.config.initial_point
         if initial_point is None:
@@ -65,16 +73,17 @@ class VQRegressor(BaseEstimator, RegressorMixin):
             ansatz=ansatz,
             optimizer=optimizer,
             estimator=self.handles.estimator,
-            gradient=gradient,
             initial_point=np.asarray(initial_point, dtype=float),
         )
 
     def fit(self, X: np.ndarray, y: np.ndarray) -> "VQRegressor":
         self._model = self._build_model()
-        self._model.fit(np.asarray(X, dtype=float), np.asarray(y, dtype=float))
+        Xs = np.asarray(X, dtype=float) * self.config.bandwidth
+        self._model.fit(Xs, np.asarray(y, dtype=float))
         return self
 
     def predict(self, X: np.ndarray) -> np.ndarray:
         if self._model is None:
             raise RuntimeError("VQRegressor.fit must be called before predict")
-        return np.asarray(self._model.predict(np.asarray(X, dtype=float))).ravel()
+        Xs = np.asarray(X, dtype=float) * self.config.bandwidth
+        return np.asarray(self._model.predict(Xs)).ravel()
